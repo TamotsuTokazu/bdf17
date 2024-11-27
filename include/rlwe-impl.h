@@ -4,9 +4,9 @@
 template <typename Poly, uint64_t B>
 SchemeImpl<Poly, B>::SchemeImpl(bool keygen) : sk(), skp(), engine(std::random_device{}()), distribution(0, Q - 1) {
     if (keygen) {
-        for (size_t i = 0; i < Poly::N; i++) {
-            skp.a[i] = distribution(engine);
-        }
+        // for (size_t i = 0; i < Poly::N; i++) {
+        //     skp.a[i] = distribution(engine) % 2;
+        // }
         skp.ToNTT();
         sk.push_back(skp);
     }
@@ -27,12 +27,14 @@ template <typename Poly, uint64_t B>
 Poly SchemeImpl<Poly, B>::GaloisConjugate(const Poly &x, const size_t &a) {
     Poly ret(x.is_coeff);
     if (x.is_coeff) {
-        for (size_t i = 1; i <= Poly::N; i++) {
-            ret.a[i * a % Poly::O - 1] = x.a[i - 1];
+        ret.a[a] = x.a[0];
+        for (size_t i = 1; i < Poly::N; i++) {
+            ret.a[i * a % Poly::O] = x.a[i];
         }
     } else {
-        for (size_t i = 1; i <= Poly::N; i++) {
-            ret.a[i - 1] = x.a[i * a % Poly::O - 1];
+        ret.a[0] = x.a[0];
+        for (size_t i = 1; i < Poly::N; i++) {
+            ret.a[i] = x.a[i * a % Poly::O];
         }
     }
     return ret;
@@ -69,7 +71,17 @@ typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::RLWEEncrypt(co
         result = result + a * sk[i];
         ct.push_back(a);
     }
-    ct.push_back(result + m * (Q / q_plain));
+    Poly e(true);
+    for (size_t i = 0; i < Poly::N; i++) {
+        // if (distribution(engine) % 20 == 0) {
+        //     e.a[i] = 1;
+        // }
+        // if (distribution(engine) % 20 == 1) {
+        //     e.a[i] = Q - 1;
+        // }
+    }
+    e.ToNTT();
+    ct.push_back(result + m * (Q / q_plain) + e);
     return ct;
 }
 
@@ -226,13 +238,7 @@ std::vector<typename SchemeImpl<Poly, B>::RGSWCiphertext> SchemeImpl<Poly, B>::B
     std::vector<RGSWCiphertext> result;
     for (size_t i = 0; i < z.size(); i++) {
         Poly m(true);
-        if (z[i] == 0) {
-            for (size_t j = 0; j < Poly::N; j++) {
-                m.a[j] = Q - 1;
-            }
-        } else {
-            m.a[z[i] - 1] = 1;
-        }
+        m.a[z[i] % Poly::O] = 1;
         m.ToNTT();
         auto ct = RGSWEncrypt(m, sk);
         result.push_back(ct);
@@ -244,18 +250,15 @@ template <typename Poly, uint64_t B>
 typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::Process(const std::vector<RGSWCiphertext> &BK, std::vector<uint64_t> a, uint64_t b, uint64_t q_plain) {
     Poly ca(false);
     Poly cb(true);
-    if (b == 0) {
-        for (size_t i = 0; i < Poly::N; i++) {
-            cb.a[i] = Q - Q / q_plain;
-        }
-    } else {
-        cb.a[b - 1] = Q / q_plain;
-    }
+
+    cb.a[b % Poly::O] = Q / q_plain;
+
     cb.ToNTT();
     RLWECiphertext ct{ca, cb};
 
     uint64_t t = 1;
     for (size_t i = 0; i < a.size(); i++) {
+        a[i] = a[i] % Poly::O;
         a[i] = Poly::O - a[i];
         if (a[i] != Poly::O) {
             t = Zp<Poly::O>::Mul(t, Zp<Poly::O>::Pow(a[i], Poly::O - 2));

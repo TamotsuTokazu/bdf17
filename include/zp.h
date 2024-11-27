@@ -3,9 +3,11 @@
 
 #include <cstdint>
 
-template <uint64_t p>
+template <uint64_t p_>
 class Zp {
 public:
+
+    constexpr static uint64_t p = p_;
 
     constexpr static size_t msb = 64 - __builtin_clzl(p);
     constexpr static uint64_t mu = []() {
