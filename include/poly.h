@@ -48,7 +48,6 @@ public:
         }
 
         Poly ret(is_coeff);
-        ret.is_coeff = is_coeff;
         for (size_t i = 0; i < N; i++) {
             ret.a[i] = ZZ::Add(a[i], rhs.a[i]);
         }

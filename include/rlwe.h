@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <array>
+#include <random>
 
 #include "poly.h"
 
@@ -19,7 +20,7 @@ public:
 
     constexpr static size_t G = []() {
         size_t G = 0;
-        for (uint64_t t = 1; t <= Q; t *= B) {
+        for (__uint128_t t = 1; t <= Q; t *= B) {
             G++;
         }
         return G;
@@ -39,6 +40,9 @@ public:
     Poly skp;
 
     std::vector<RLWESwitchingKey> ksk_galois;
+
+    std::mt19937_64 engine;
+    std::uniform_int_distribution<uint64_t> distribution;
 
     SchemeImpl(bool keygen = true);
     void GaloisKeyGen();
@@ -64,6 +68,9 @@ public:
 
     RLWESwitchingKey KeySwitchGen(const RLWEKey &sk, const RLWEKey &skN);
     RLWECiphertext KeySwitch(const RLWECiphertext &ct, const RLWESwitchingKey &K);
+
+    std::vector<RGSWCiphertext> BootstrappingKeyGen(std::vector<uint64_t> z);
+    RLWECiphertext Process(const std::vector<RGSWCiphertext> &BK, std::vector<uint64_t> a, uint64_t b, uint64_t q_plain);
 };
 
 #include "rlwe-impl.h"

@@ -379,6 +379,53 @@ uint64_t NTT<p, g, O, w>::omega_N_barrett_table[N];
 template <uint64_t p, uint64_t g, size_t O, size_t w>
 uint64_t NTT<p, g, O, w>::omega_N_inv_barrett_table[N];
 
+template <uint64_t p_, uint64_t g_, size_t O_, size_t w_>
+class CircNTT {
+public:
+    using PrimitiveNTT = NTT<p_, g_, O_, w_>;
+
+    constexpr static uint64_t p = p_;
+    constexpr static uint64_t g = g_;
+    constexpr static size_t O = O_;
+    constexpr static size_t w = w_;
+    constexpr static size_t N = O;
+
+    using ZZ = Zp<p>;
+
+    constexpr static uint64_t N_inv = ZZ::Pow(N, p - 2);
+
+    void ForwardNTT(uint64_t a[]) {
+        auto t = a[0];
+        for (size_t i = 1; i < N; i++) {
+            a[0] = ZZ::Add(a[0], a[i]);
+        }
+        PrimitiveNTT::GetInstance().ForwardNTT(a + 1);
+        for (size_t i = 1; i < N; i++) {
+            a[i] = ZZ::Add(a[i], t);
+        }
+    }
+
+    void InverseNTT(uint64_t a[]) {
+        PrimitiveNTT::GetInstance().InverseNTT(a + 1);
+        auto t = a[0];
+        for (size_t i = 1; i < N; i++) {
+            t = ZZ::Sub(t, a[i]);
+        }
+        a[0] = ZZ::Mul(t, N_inv);
+        for (size_t i = 1; i < N; i++) {
+            a[i] = ZZ::Add(a[i], a[0]);
+        }
+    }
+
+    static CircNTT &GetInstance() {
+        static CircNTT instance;
+        return instance;
+    }
+
+private:
+    CircNTT() {}
+};
+
 template <typename NTTp_, typename NTTq_>
 class TensorNTTImpl {
 public:
@@ -455,8 +502,7 @@ public:
     }
 
 private:
-    TensorNTTImpl() {
-    }
+    TensorNTTImpl() {}
 
 };
 

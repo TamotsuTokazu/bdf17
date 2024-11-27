@@ -6,6 +6,13 @@
 template <uint64_t p>
 class Zp {
 public:
+
+    constexpr static size_t msb = 64 - __builtin_clzl(p);
+    constexpr static uint64_t mu = []() {
+        auto t = __uint128_t(1) << (2 * msb + 3);
+        return t / p;
+    }();
+
     constexpr static uint64_t Add(uint64_t a, uint64_t b) {
         uint64_t sum = a + b;
         return sum >= p ? sum - p : sum;
@@ -17,6 +24,12 @@ public:
 
     constexpr static uint64_t Mul(uint64_t a, uint64_t b) {
         return (uint64_t)((__uint128_t)a * b % p);
+        // int64_t n = msb - 2;
+        // auto t = (__uint128_t)a * b;
+        // auto r = t;
+        // t = (t >> n) * mu;
+        // r -= p * (t >> (n + 7));
+        // return r >= p ? r - p : r;
     }
 
     constexpr static uint64_t MulFastConst(uint64_t a, uint64_t b, uint64_t b_mu) {
