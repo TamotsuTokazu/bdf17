@@ -2,14 +2,15 @@
 #define RLWE_IMPL_H
 
 template <typename Poly, uint64_t B>
-SchemeImpl<Poly, B>::SchemeImpl(bool keygen) : sk(), skp(), engine(std::random_device{}()), distribution(0, Q - 1) {
-    if (keygen) {
-        // for (size_t i = 0; i < Poly::N; i++) {
-        //     skp.a[i] = distribution(engine) % 2;
-        // }
-        skp.ToNTT();
-        sk.push_back(skp);
+SchemeImpl<Poly, B>::SchemeImpl() : sk(), skp(), engine(std::random_device{}()), distribution(0, Q - 1) {}
+
+template <typename Poly, uint64_t B>
+SchemeImpl<Poly, B>::SchemeImpl(std::vector<int64_t> skVec) : sk(1), skp(true), engine(std::random_device{}()), distribution(0, Q - 1) {
+    for (size_t i = 0; i < skVec.size(); i++) {
+        skp.a[i] = skVec[i] < 0 ? skVec[i] + Q : skVec[i];
     }
+    skp.ToNTT();
+    sk[0] = skp;
 }
 
 template <typename Poly, uint64_t B>
@@ -72,16 +73,12 @@ typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::RLWEEncrypt(co
         ct.push_back(a);
     }
     Poly e(true);
-    for (size_t i = 0; i < Poly::N; i++) {
-        // if (distribution(engine) % 20 == 0) {
-        //     e.a[i] = 1;
-        // }
-        // if (distribution(engine) % 20 == 1) {
-        //     e.a[i] = Q - 1;
-        // }
-    }
+    auto rand = GaussianSampler<Poly::N>::GetInstance().SampleE(1.0);
+    // for (size_t i = 0; i < Poly::N; i++) {
+    //     e.a[i] = rand[i] < 0 ? rand[i] + Q : rand[i];
+    // }
     e.ToNTT();
-    ct.push_back(result + m * (Q / q_plain) + e);
+    ct.push_back(result + e + m * (Q / q_plain));
     return ct;
 }
 
@@ -132,11 +129,21 @@ void SchemeImpl<Poly, B>::ModSwitch(Poly &x, uint64_t q) {
     }
 }
 
-template <typename Poly, uint64_t B>
-void SchemeImpl<Poly, B>::ModSwitch(RLWECiphertext &ct, uint64_t q) {
-    for (auto &elem : ct) {
+template <typename Poly, uint64_t B> template <typename S>
+typename S::RLWECiphertext SchemeImpl<Poly, B>::ModSwitch(const RLWECiphertext &ct) {
+    auto q = S::Q;
+    typename S::RLWECiphertext result;
+    for (auto elem : ct) {
+        elem.ToCoeff();
         ModSwitch(elem, q);
+        typename S::Poly tmp;
+        for (size_t i = 0; i < S::Poly::N; i++) {
+            tmp.a[i] = elem.a[i];
+        }
+        tmp.ToNTT();
+        result.push_back(tmp);
     }
+    return result;
 }
 
 template <typename Poly, uint64_t B>
@@ -234,11 +241,11 @@ typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::ExtMult(const 
 }
 
 template <typename Poly, uint64_t B>
-std::vector<typename SchemeImpl<Poly, B>::RGSWCiphertext> SchemeImpl<Poly, B>::BootstrappingKeyGen(std::vector<uint64_t> z) {
+std::vector<typename SchemeImpl<Poly, B>::RGSWCiphertext> SchemeImpl<Poly, B>::BootstrappingKeyGen(std::vector<int64_t> z) {
     std::vector<RGSWCiphertext> result;
     for (size_t i = 0; i < z.size(); i++) {
         Poly m(true);
-        m.a[z[i] % Poly::O] = 1;
+        m.a[(z[i] + Poly::O) % Poly::O] = 1;
         m.ToNTT();
         auto ct = RGSWEncrypt(m, sk);
         result.push_back(ct);
@@ -247,17 +254,28 @@ std::vector<typename SchemeImpl<Poly, B>::RGSWCiphertext> SchemeImpl<Poly, B>::B
 }
 
 template <typename Poly, uint64_t B>
-typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::Process(const std::vector<RGSWCiphertext> &BK, std::vector<uint64_t> a, uint64_t b, uint64_t q_plain) {
+typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::Process(const std::vector<RGSWCiphertext> &BK, std::vector<int64_t> a, int64_t b, uint64_t q_plain) {
     Poly ca(false);
     Poly cb(true);
 
-    cb.a[b % Poly::O] = Q / q_plain;
+    if (b < 0) {
+        b = -b;
+        b = b % Poly::O;
+        b = Poly::O - b;
+    }
+    b = b % Poly::O;
+    cb.a[b] = Q / q_plain;
 
     cb.ToNTT();
     RLWECiphertext ct{ca, cb};
 
     uint64_t t = 1;
     for (size_t i = 0; i < a.size(); i++) {
+        if (a[i] < 0) {
+            a[i] = -a[i];
+            a[i] = a[i] % Poly::O;
+            a[i] = Poly::O - a[i];
+        }
         a[i] = a[i] % Poly::O;
         a[i] = Poly::O - a[i];
         if (a[i] != Poly::O) {
