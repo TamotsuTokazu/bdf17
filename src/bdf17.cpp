@@ -9,16 +9,11 @@
 #define END_TIMER std::cout << "Time: " << (std::chrono::duration<double>(std::chrono::system_clock::now() - start).count()) << std::endl
 auto start = std::chrono::system_clock::now();
 
-// using NTTp = CircNTT<1099511555521LL, 37LL, 5, 2>;
-// using NTTq = CircNTT<1099511555521LL, 37LL, 7, 3>;
-
 using NTTp = CircNTT<72057421557668737LL, 5LL, 1153, 5>;
 using NTTq = CircNTT<72057421557668737LL, 5LL, 1297, 10>;
 
-// using NTTpt = CircNTT<1069826527873LL, 7LL, 1153, 5>;
-// using NTTqt = CircNTT<1069826527873LL, 7LL, 1297, 10>;
-using NTTpt = NTTp;
-using NTTqt = NTTq;
+using NTTpt = CircNTT<1069826527873LL, 7LL, 1153, 5>;
+using NTTqt = CircNTT<1069826527873LL, 7LL, 1297, 10>;
 
 using NTTpq = TensorNTTImpl<NTTpt, NTTqt>;
 
@@ -222,12 +217,8 @@ int main() {
         tensor_ct[0] = f * tensor_ct[0];
         tensor_ct[1] = f * tensor_ct[1];
 
-        // SchemePQ::RLWEDecrypt(tensor_ct, skp0, Qplain).print();
-
         SchemePt::RLWECiphertext ct_trace = {TracePQtoP(tensor_ct[0]), TracePQtoP(tensor_ct[1])};
         SchemePt::RLWEKey sk_trace = {TracePQtoP(skp0[0])};
-
-        // SchemePt::RLWEDecrypt(ct_trace, sk_trace, Qplain).print();
 
         auto b_out = TracePtoZ(ct_trace[1]);
 
