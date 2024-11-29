@@ -12,8 +12,8 @@ auto start = std::chrono::system_clock::now();
 using NTTp = CircNTT<72057421557668737LL, 5LL, 1153, 5>;
 using NTTq = CircNTT<72057421557668737LL, 5LL, 1297, 10>;
 
-using NTTpt = CircNTT<1069826527873LL, 7LL, 1153, 5>;
-using NTTqt = CircNTT<1069826527873LL, 7LL, 1297, 10>;
+using NTTpt = CircNTT<108533126017LL, 10LL, 1153, 5>;
+using NTTqt = CircNTT<108533126017LL, 10LL, 1297, 10>;
 
 using NTTpq = TensorNTTImpl<NTTpt, NTTqt>;
 
@@ -24,7 +24,7 @@ using PolyQt = Poly<NTTqt>;
 
 using PolyPQ = Poly<NTTpq>;
 
-using ZZ = NTTpq::ZZ;
+using Z = NTTpq::Z;
 
 constexpr size_t n = 600;
 constexpr uint64_t Qplain = 64;
@@ -39,30 +39,31 @@ using SchemePt = SchemeImpl<PolyPt, Bks>;
 using SchemeQt = SchemeImpl<PolyQt, Bks>;
 
 std::mt19937 engine(std::random_device{}());
-std::uniform_int_distribution<size_t> distribution3(0, 2);
 std::uniform_int_distribution<size_t> distributionp(0, pq - 1);
 
-PolyPQ Tensor(const PolyPt &a, const PolyQt &b) {
+template <typename PolyPT, typename PolyQT>
+Poly<TensorNTTImpl<typename PolyPT::NTT, typename PolyQT::NTT>> Tensor(const PolyPT &a, const PolyQT &b) {
     if (a.is_coeff || b.is_coeff) {
         throw std::runtime_error("Tensor product is not supported for coefficient domain");
     }
-    
-    PolyPQ c(false);
-    for (size_t i = 0; i < PolyPt::N; i++) {
-        for (size_t j = 0; j < PolyQt::N; j++) {
-            c.a[i * PolyQ::N + j] = ZZ::Mul(a.a[i], b.a[j]);
+
+    Poly<TensorNTTImpl<typename PolyPT::NTT, typename PolyQT::NTT>> c(false);
+    for (size_t i = 0; i < PolyPT::N; i++) {
+        for (size_t j = 0; j < PolyQT::N; j++) {
+            c.a[i * PolyQT::N + j] = Z::Mul(a.a[i], b.a[j]);
         }
     }
     return c;
 }
 
-PolyPQ GenKey(std::vector<int64_t> &sk) {
-    PolyPt skp(true);
-    PolyQt one(false);
+template <typename PolyPT, typename PolyQT>
+Poly<TensorNTTImpl<typename PolyPT::NTT, typename PolyQT::NTT>> GenKey(std::vector<int64_t> &sk) {
+    PolyPT skp(true);
+    PolyQT one(false);
     for (size_t i = 0; i < sk.size(); i++) {
-        skp.a[i] = sk[i] < 0 ? sk[i] + PolyPt::p : sk[i];
+        skp.a[i] = sk[i] < 0 ? sk[i] + PolyPT::p : sk[i];
     }
-    for (size_t i = 0; i < PolyQt::N; i++) {
+    for (size_t i = 0; i < PolyQT::N; i++) {
         one.a[i] = 1;
     }
     skp.ToNTT();
@@ -83,7 +84,7 @@ typename SchemePQ::RLWEKey TensorKey(const SchemePt::RLWEKey &skp, const SchemeQ
     }
     PolyPQ skpq0 = Tensor(skp0, skq0);
     for (size_t i = 0; i < PolyPQ::N; i++) {
-        skpq0.a[i] = ZZ::Sub(0, skpq0.a[i]);
+        skpq0.a[i] = Z::Sub(0, skpq0.a[i]);
     }
     skpq.push_back(skpq0);
     skpq.push_back(Tensor(skp0, q1));
@@ -109,28 +110,29 @@ PolyPt TracePQtoP(const PolyPQ &a) {
         }
         return b;
     } else {
-        uint64_t z = ZZ::Pow(PolyQt::N, ZZ::p - 2);
+        uint64_t z = Z::Pow(PolyQt::N, Z::p - 2);
         PolyPt b(false);
         for (size_t i = 0; i < PolyPt::N; i++) {
             size_t ii = i;
             for (size_t j = 0; j < PolyQt::N; j++) {
-                b.a[ii] = ZZ::Add(b.a[ii], a.a[i * PolyQt::N + j]);
+                b.a[ii] = Z::Add(b.a[ii], a.a[i * PolyQt::N + j]);
             }
-            b.a[ii] = ZZ::Mul(b.a[ii], z);
+            b.a[ii] = Z::Mul(b.a[ii], z);
         }
         return b;
     }
 }
 
-uint64_t TracePtoZ(const PolyPt &a) {
+template <typename Poly>
+uint64_t TracePtoZ(const Poly &a) {
     if (a.is_coeff) {
         return a.a[0];
     } else {
         uint64_t z = 0;
-        for (size_t i = 0; i < PolyPt::N; i++) {
-            z = ZZ::Add(z, a.a[i]);
+        for (size_t i = 0; i < Poly::N; i++) {
+            z = Poly::Z::Add(z, a.a[i]);
         }
-        return ZZ::Mul(z, ZZ::Pow(PolyPt::N, ZZ::p - 2));
+        return Poly::Z::Mul(z, Z::Pow(Poly::N, Z::p - 2));
     }
 }
 
@@ -148,13 +150,15 @@ std::uniform_int_distribution<size_t> distribution(0, Qplain - 1);
 
 int main() {
 
-    std::vector<int64_t> sk = GaussianSampler<n>::GetInstance().SampleSk(0.3);
+    START_TIMER;
+
+    std::vector<int64_t> sk = GaussianSampler<n>::GetInstance().SampleSk(0.33);
 
     std::vector<size_t> f_plain(Qplain, 0);
 
     // define f
     for (size_t i = 0; i < Qplain; i++) {
-        f_plain[i] = i % Qplain;
+        f_plain[i] = i & 1;
     }
 
     std::vector<size_t> f_ct(pq, 0);
@@ -181,8 +185,10 @@ int main() {
 
     SchemePQ schemePQ;
     auto skpq = TensorKey(schemePt.sk, schemeQt.sk);
-    SchemePQ::RLWEKey skp0{GenKey(sk)};
+    SchemePQ::RLWEKey skp0{GenKey<PolyPt, PolyQt>(sk)};
     auto tensorBK = schemePQ.KeySwitchGen(skpq, skp0);
+
+    END_TIMER;
 
     for (size_t n_test = 0; n_test < N_tests; n_test++) {
 
@@ -195,8 +201,9 @@ int main() {
 
         int64_t b = b0 * pq / Qplain;
         for (size_t i = 0; i < n; i++) {
-            b = ((b + sk[i] * a[i]) % (int64_t)pq + (int64_t)pq) % pq;
+            b = (b + sk[i] * a[i]) % (int64_t)pq;
         }
+        b = (b + pq) % pq;
 
         START_TIMER;
 
@@ -232,12 +239,12 @@ int main() {
         END_TIMER;
 
         for (size_t i = 0; i < n; i++) {
-            b_out = ZZ::Sub(b_out, ZZ::Mul(sk[i] + ZZ::p, a_out[i]));
+            b_out = Z::Sub(b_out, Z::Mul(sk[i] + Z::p, a_out[i]));
         }
-        std::cout << "b: " << b_out << " " << (b_out * Qplain + ZZ::p / 2) / ZZ::p << std::endl;
+        std::cout << "result: " << (size_t)(0.5 + (double)Qplain * b_out / Z::p) % Qplain << std::endl;
         std::cout << "expected: " << f_plain[b0] << std::endl;
 
-        if (f_plain[b0] != (b_out * Qplain + ZZ::p / 2) / ZZ::p) {
+        if (f_plain[b0] != (size_t)(0.5 + (double)Qplain * b_out / Z::p) % Qplain) {
             std::cout << "Error" << std::endl;
             return 1;
         }

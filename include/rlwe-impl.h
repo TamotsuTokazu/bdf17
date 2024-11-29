@@ -6,9 +6,7 @@ SchemeImpl<Poly, B>::SchemeImpl() : sk(), skp(), engine(std::random_device{}()),
 
 template <typename Poly, uint64_t B>
 SchemeImpl<Poly, B>::SchemeImpl(std::vector<int64_t> skVec) : sk(1), skp(true), engine(std::random_device{}()), distribution(0, Q - 1) {
-    for (size_t i = 0; i < skVec.size(); i++) {
-        skp.a[i] = skVec[i] < 0 ? skVec[i] + Q : skVec[i];
-    }
+    skp = Poly::FromCoeff(skVec);
     skp.ToNTT();
     sk[0] = skp;
 }
@@ -25,29 +23,12 @@ void SchemeImpl<Poly, B>::GaloisKeyGen() {
 }
 
 template <typename Poly, uint64_t B>
-Poly SchemeImpl<Poly, B>::GaloisConjugate(const Poly &x, const size_t &a) {
-    Poly ret(x.is_coeff);
-    if (x.is_coeff) {
-        ret.a[a] = x.a[0];
-        for (size_t i = 1; i < Poly::N; i++) {
-            ret.a[i * a % Poly::O] = x.a[i];
-        }
-    } else {
-        ret.a[0] = x.a[0];
-        for (size_t i = 1; i < Poly::N; i++) {
-            ret.a[i] = x.a[i * a % Poly::O];
-        }
-    }
-    return ret;
-}
-
-template <typename Poly, uint64_t B>
 template <typename T>
 std::vector<T> SchemeImpl<Poly, B>::GaloisConjugate(const std::vector<T> &x, const size_t &a) {
     std::vector<T> ret;
     ret.reserve(x.size());
     for (const auto &elem : x) {
-        ret.push_back(GaloisConjugate(elem, a));
+        ret.push_back(Poly::GaloisConjugate(elem, a));
     }
     return ret;
 }
@@ -55,7 +36,7 @@ std::vector<T> SchemeImpl<Poly, B>::GaloisConjugate(const std::vector<T> &x, con
 template <typename Poly, uint64_t B>
 template <typename T1, typename T2>
 std::pair<T1, T2> SchemeImpl<Poly, B>::GaloisConjugate(const std::pair<T1, T2> &x, const size_t &a) {
-    return {GaloisConjugate(x.first, a), GaloisConjugate(x.second, a)};
+    return {Poly::GaloisConjugate(x.first, a), Poly::GaloisConjugate(x.second, a)};
 }
 
 template <typename Poly, uint64_t B>
@@ -72,11 +53,8 @@ typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::RLWEEncrypt(co
         result = result + a * sk[i];
         ct.push_back(a);
     }
-    Poly e(true);
-    auto rand = GaussianSampler<Poly::N>::GetInstance().SampleE(1.0);
-    // for (size_t i = 0; i < Poly::N; i++) {
-    //     e.a[i] = rand[i] < 0 ? rand[i] + Q : rand[i];
-    // }
+    auto rand = GaussianSampler<Poly::N>::GetInstance().SampleE(4.0);
+    Poly e = Poly::FromCoeff(rand);
     e.ToNTT();
     ct.push_back(result + e + m * (Q / q_plain));
     return ct;
@@ -218,7 +196,7 @@ typename SchemeImpl<Poly, B>::RLWECiphertext SchemeImpl<Poly, B>::ExtMult(const 
     Poly b = ct[1];
 
     for (size_t i = 0; i < Poly::N; i++) {
-        a.a[i] = Poly::ZZ::Sub(0, a.a[i]);
+        a.a[i] = Poly::Z::Sub(0, a.a[i]);
     }
 
     a.ToCoeff();

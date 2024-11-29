@@ -96,8 +96,6 @@ public:
 
     void GaloisKeyGen();
 
-    static Poly GaloisConjugate(const Poly &x, const size_t &a);
-
     template <typename T>
     static std::vector<T> GaloisConjugate(const std::vector<T> &x, const size_t &a);
 
