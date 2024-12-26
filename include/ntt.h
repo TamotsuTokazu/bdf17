@@ -123,12 +123,12 @@ public:
     constexpr static std::array<uint64_t, N> bit_reverse_table = PrecomputeBitReverseTable();
 
     
-    static uint64_t omega_N_table[N];
-    static uint64_t omega_N_inv_table[N];
-    static uint64_t omega_N_barrett_table[N];
-    static uint64_t omega_N_inv_barrett_table[N];
+    uint64_t omega_N_table[N];
+    uint64_t omega_N_inv_table[N];
+    uint64_t omega_N_barrett_table[N];
+    uint64_t omega_N_inv_barrett_table[N];
 
-    static void ComputeOmegaNTable() {
+    void ComputeOmegaNTable() {
         omega_N_table[0] = 1;
         for (size_t i = 1; i < N; i++) {
             omega_N_table[i] = Z::Mul(omega_N_table[i - 1], omega_N);
@@ -278,10 +278,10 @@ public:
         CT23NTT(a, b, omega_N_inv_table, omega_N_inv_barrett_table);
     }
 
-    static uint64_t omega_O_table[N];
-    static uint64_t omega_O_inv_table[N];
-    static uint64_t omega_O_barrett_table[N];
-    static uint64_t omega_O_inv_barrett_table[N];
+    uint64_t omega_O_table[N];
+    uint64_t omega_O_inv_table[N];
+    uint64_t omega_O_barrett_table[N];
+    uint64_t omega_O_inv_barrett_table[N];
 
     void ComputeOmegaOTable() {
         uint64_t t = omega_O;
@@ -300,8 +300,6 @@ public:
             omega_O_inv_barrett_table[i] = Z::ComputeBarrettFactor(omega_O_inv_table[i]);
         }
     }
-
-    static bool initialized;
 
     void ForwardNTT(uint64_t a[]) {
         static uint64_t reg[N];
@@ -354,30 +352,6 @@ private:
         ComputeOmegaOTable();
     }
 };
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_O_table[N];
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_O_inv_table[N];
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_O_barrett_table[N];
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_O_inv_barrett_table[N];
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_N_table[N];
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_N_inv_table[N];
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_N_barrett_table[N];
-
-template <uint64_t p, uint64_t g, size_t O, size_t w>
-uint64_t NTT<p, g, O, w>::omega_N_inv_barrett_table[N];
 
 template <uint64_t p_, uint64_t g_, size_t O_, size_t w_>
 class CircNTT {
